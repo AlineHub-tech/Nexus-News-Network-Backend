@@ -1,11 +1,11 @@
-// server.js (Uburyo butunganije neza)
+// server.js (Uburyo butunganije neza kandi CORS yakosowe)
 
 const express = require('express');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db'); 
 const cors = require('cors'); 
-const path = require('path'); // Dukeneye path kubika files
-const fs = require('fs'); // ONGERAHO UYU MURONGO
+const path = require('path'); 
+const fs = require('fs'); 
 
 // Tegura .env variables
 dotenv.config();
@@ -16,10 +16,16 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middlewares
-app.use(cors()); 
+
+// --- UMURONGO W'INGENZI WAKOSOWE HANO ---
+// Twemerera gusa urubuga rwa Vercel kwihuza na API yacu kubera umutekano.
+app.use(cors({
+    origin: 'https://nexus-news-network.vercel.app' 
+}));
+// ----------------------------------------
+
 app.use(express.json()); 
 
-// SHYIRAMO IYI LOGIC YOSE HANO:
 // Genzura no kurema folder ya 'uploads' niba idahari
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -28,7 +34,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Gutanga serivise y'amafiles yibitse muri folder ya uploads
-app.use('/uploads', express.static(uploadsDir)); // Wahindura path hano ugakoresha variable uploadsDir
+app.use('/uploads', express.static(uploadsDir)); 
 
 // Import Routes
 const publicRoutes = require('./routes/publicRoutes');
@@ -42,6 +48,6 @@ app.use('/api/writer', writerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes); 
 
-// ... (app.get('/') routes hano) ...
+// ... (Ushobora kongeramo app.get('/') routes hano niba ukeneye kugaragaza ko server iri gukora) ...
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
