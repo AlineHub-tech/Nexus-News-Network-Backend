@@ -18,11 +18,26 @@ const PORT = process.env.PORT || 5000;
 
 // Middlewares
 
-// --- UMUTEKANO: CORS configuration ---
-// Twemerera gusa urubuga rwa Vercel kwihuza na API yacu kubera umutekano.
-// Mu gihe uri development local, localhost:3000 nayo irakora byikora.
+// --- UMUTEKANO & CORS configuration YAKOSOWE HANO ---
+
+// Tegura adiresi zose zemewe, harimo n'iza Vercel development domains
+const allowedOrigins = [
+  'https://nexus-news-network.vercel.app', // Adiresi ya Production
+  'https://nexus-news-network-dmzpo7t4c-umugwaneza-aline-s-projects.vercel.app', // Urugero rwa Adiresi ya Development
+  'http://localhost:3000', // Kuri local development ya frontend
+  'http://localhost:5000' // Kuri local development ya backend (localhost nayo ishobora kwihamagara)
+];
+
+// Shyiraho CORS Middleware ikoresha izo adiresi zemewe
 app.use(cors({
-    origin: 'https://nexus-news-network.vercel.app'
+    origin: function (origin, callback) {
+      // Emera nta kibazo niba origin itari muri allowedOrigins cyangwa ari undefined (ex: requests ziva muri server)
+      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS')); // Hindura Error msg ikore neza
+      }
+    }
 }));
 // ----------------------------------------
 
@@ -45,7 +60,6 @@ const adminRoutes = require('./routes/adminRoutes');
 const authRoutes = require('./routes/authRoutes');
 
 // Koresha Inzira (Routes)
-// Turakomeza gukoresha '/api/public' muri Backend kugira ngo bihuze na Frontend
 app.use('/api/public', publicRoutes);
 app.use('/api/writer', writerRoutes);
 app.use('/api/admin', adminRoutes);
