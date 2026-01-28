@@ -1,4 +1,4 @@
-// server.js (Uburyo butunganije neza kandi CORS yakosowe)
+
 
 const express = require('express');
 const dotenv = require('dotenv');
@@ -72,3 +72,4 @@ app.get('/', (req, res) => {
 
 // Gukora Listen kuri Port
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
