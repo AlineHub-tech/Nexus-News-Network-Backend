@@ -1,5 +1,3 @@
-// server/routes/adminRoutes.js
-
 const express = require('express');
 const router = express.Router();
 const Article = require('../models/Article');
@@ -10,30 +8,82 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
-// Configure Cloudinary
+// --- CLOUDINARY CONFIGURATION ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Tegura Cloudinary Storage
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'nexus-news-uploads',
-    // Hano twakuyemo format: 'jpg' kugira ngo na Videos zibashe kwakirwa neza
-    resource_type: 'auto', 
+    resource_type: 'auto',
     public_id: (req, file) => file.fieldname + '-' + Date.now(),
   },
 });
+
 const upload = multer({ storage: storage });
 
-// --- ADS MANAGEMENT (YAKOSOWE) ---
+// ==========================================
+// 1. INKURU MANAGEMENTS (ARTICLES)
+// ==========================================
 
-// 1. Kohereza Ad Nshya (Harimo Placement & mediaUrl)
+// Kubona inkuru zose zitarasuzumwa (Pending)
+router.get('/pending-articles', [auth, admin], async (req, res) => {
+    try {
+        const articles = await Article.find({ 
+            status: { $in: ['pending', 'Pending'] } 
+        }).sort({ createdAt: -1 });
+        res.json(articles);
+    } catch (err) {
+        res.status(500).send('Server Error');
+    }
+});
+
+// Kubona inkuru zose zemejwe (Approved)
+router.get('/approved-articles', [auth, admin], async (req, res) => {
+    try {
+        const articles = await Article.find({ 
+            status: { $in: ['approved', 'Approved'] } 
+        }).sort({ createdAt: -1 });
+        res.json(articles);
+    } catch (err) {
+        res.status(500).send('Server Error');
+    }
+});
+
+// Kwemeza inkuru (Approve)
+router.put('/articles/:id/approve', [auth, admin], async (req, res) => {
+    try {
+        const article = await Article.findByIdAndUpdate(
+            req.params.id, 
+            { status: 'Approved' }, 
+            { new: true }
+        );
+        res.json(article);
+    } catch (err) { 
+        res.status(500).send('Server Error'); 
+    }
+});
+
+// Gusiba inkuru burundu
+router.delete('/articles/:id', [auth, admin], async (req, res) => {
+    try {
+        await Article.findByIdAndDelete(req.params.id);
+        res.json({ msg: 'Article deleted' });
+    } catch (err) { 
+        res.status(500).send('Server Error'); 
+    }
+});
+
+// ==========================================
+// 2. ADS MANAGEMENT (KUREBA & GUSIBA)
+// ==========================================
+
+// Kohereza Ad nshya
 router.post('/ads', [auth, admin, upload.single('mediaFile')], async (req, res) => {
-    // HANO NIHO HAKOSOWE: Twongereye 'placement'
     const { title, description, mediaType, placement } = req.body;
     const mediaUrl = req.file ? req.file.path : null; 
 
@@ -43,30 +93,17 @@ router.post('/ads', [auth, admin, upload.single('mediaFile')], async (req, res) 
             description, 
             mediaUrl, 
             mediaType, 
-            placement: placement || 'slider', // Ibi ni ingenzi kuri Frontend
+            placement: placement || 'slider',
             isActive: true 
         });
         const savedAd = await newAd.save();
         res.status(201).json(savedAd);
     } catch (err) {
-        console.error(err.message); 
-        res.status(500).send('Server Error: Ad upload failed');
+        res.status(500).send('Server Error');
     }
 });
 
-// 2. Gusiba Ad (Yakosowe)
-router.delete('/ads/:id', [auth, admin], async (req, res) => {
-    try {
-        const ad = await Ads.findByIdAndDelete(req.params.id);
-        if (!ad) return res.status(404).json({ msg: 'Ad ntabonetse' });
-        res.json({ msg: 'Ad yasibwe neza' });
-    } catch (err) { 
-        console.error(err.message); 
-        res.status(500).send('Server Error'); 
-    }
-});
-
-// 3. Kubona Ads zose
+// Kureba Ads zose ziriho (Iyi niyo yari ibura ituma utazibona)
 router.get('/ads', [auth, admin], async (req, res) => {
     try {
         const ads = await Ads.find().sort({ createdAt: -1 });
@@ -76,39 +113,12 @@ router.get('/ads', [auth, admin], async (req, res) => {
     }
 });
 
-// --- ARTICLE MANAGEMENT (YAKOSOWE) ---
-
-// Guhamagara inkuru zemejwe (Case Sensitive Fix)
-router.get('/approved-articles', [auth, admin], async (req, res) => {
+// Gusiba Ad (Iyi niyo yari ibura ituma utayisiba)
+router.delete('/ads/:id', [auth, admin], async (req, res) => {
     try {
-        // Hano twongereye 'Approved' kugira ngo ihure n'uko state ya Frontend ibishaka
-        const articles = await Article.find({ 
-            $or: [{ status: 'approved' }, { status: 'Approved' }] 
-        }).sort({ createdAt: -1 });
-        res.json(articles);
-    } catch (err) {
-        res.status(500).send('Server Error');
-    }
-});
-
-// Kwemeza inkuru (Approved Fix)
-router.put('/articles/:id/approve', [auth, admin], async (req, res) => {
-    try {
-        // Hindura uburyo ubyandika bibe 'Approved'
-        const article = await Article.findByIdAndUpdate(req.params.id, { status: 'Approved' }, { new: true });
-        if (!article) return res.status(404).json({ msg: 'Inkuru ntabonetse' });
-        res.json(article);
-    } catch (err) { 
-        res.status(500).send('Server Error'); 
-    }
-});
-
-// Gusiba Inkuru
-router.delete('/articles/:id', [auth, admin], async (req, res) => {
-    try {
-        const article = await Article.findByIdAndDelete(req.params.id);
-        if (!article) return res.status(404).json({ msg: 'Inkuru ntabonetse' });
-        res.json({ msg: 'Inkuru yasibwe' });
+        const ad = await Ads.findByIdAndDelete(req.params.id);
+        if (!ad) return res.status(404).json({ msg: 'Ad not found' });
+        res.json({ msg: 'Ad deleted successfully' });
     } catch (err) { 
         res.status(500).send('Server Error'); 
     }
