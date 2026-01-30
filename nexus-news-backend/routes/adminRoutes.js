@@ -1,5 +1,3 @@
-// server/routes/adminRoutes.js
-
 const express = require('express');
 const router = express.Router();
 const Article = require('../models/Article');
@@ -23,7 +21,7 @@ const storage = new CloudinaryStorage({
   params: {
     folder: 'nexus-news-uploads',
     resource_type: 'auto', 
-    public_id: (req, file) => file.fieldname + '-' + Date.now(),
+    public_id: (req, file) => `file-${Date.now()}`,
   },
 });
 const upload = multer({ storage: storage });
@@ -32,10 +30,10 @@ const upload = multer({ storage: storage });
 
 // Kohereza Ad Nshya
 router.post('/ads', [auth, admin, upload.single('mediaFile')], async (req, res) => {
-    const { title, description, mediaType, placement } = req.body;
-    const mediaUrl = req.file ? req.file.path : null; 
-
     try {
+        const { title, description, mediaType, placement } = req.body;
+        const mediaUrl = req.file ? req.file.path : null; 
+
         const newAd = new Ads({ 
             title, 
             description, 
@@ -47,8 +45,8 @@ router.post('/ads', [auth, admin, upload.single('mediaFile')], async (req, res) 
         const savedAd = await newAd.save();
         res.status(201).json(savedAd);
     } catch (err) {
-        console.error(err.message); 
-        res.status(500).send('Server Error: Ad upload failed');
+        console.error("Ad Error:", err.message);
+        res.status(500).json({ msg: 'Server Error: Ad upload failed' });
     }
 });
 
@@ -75,17 +73,27 @@ router.delete('/ads/:id', [auth, admin], async (req, res) => {
 
 // --- ARTICLE MANAGEMENT ---
 
-// A. Guhamagara inkuru zemejwe (Zose zanditse 'Approved' mu gutangira)
+// 1. Kuzana inkuru zitegereje kwemezwa (Zari zateje 404 Error)
+router.get('/pending-articles', [auth, admin], async (req, res) => {
+    try {
+        const articles = await Article.find({ status: 'Pending' }).sort({ createdAt: -1 });
+        res.json(articles);
+    } catch (err) {
+        res.status(500).json({ msg: 'Server Error' });
+    }
+});
+
+// 2. Kuzana inkuru zemejwe (Approved)
 router.get('/approved-articles', [auth, admin], async (req, res) => {
     try {
         const articles = await Article.find({ status: 'Approved' }).sort({ createdAt: -1 });
         res.json(articles);
     } catch (err) {
-        res.status(500).send('Server Error');
+        res.status(500).json({ msg: 'Server Error' });
     }
 });
 
-// B. KWEMEZA INKURU (Approve)
+// 3. KWEMEZA INKURU (Approve)
 router.put('/articles/:id/approve', [auth, admin], async (req, res) => {
     try {
         const article = await Article.findByIdAndUpdate(
@@ -96,47 +104,43 @@ router.put('/articles/:id/approve', [auth, admin], async (req, res) => {
         if (!article) return res.status(404).json({ msg: 'Inkuru ntabonetse' });
         res.json(article);
     } catch (err) { 
-        res.status(500).send('Server Error'); 
+        res.status(500).json({ msg: 'Server Error' }); 
     }
 });
 
-// C. GUHINDURA INKURU (Edit/Update) - Iyi niyo yari ibuzemo
+// 4. GUHINDURA INKURU (Edit/Update)
+// Icyitonderwa: Emeza ko kuri Frontend ukoresha 'image' nka field name mu gufata ifoto
 router.put('/articles/:id', [auth, admin, upload.single('image')], async (req, res) => {
-    const { title, content, category, author, status } = req.body;
-    
-    // Tegura amakuru mashya
-    const updatedFields = {};
-    if (title) updatedFields.title = title;
-    if (content) updatedFields.content = content;
-    if (category) updatedFields.category = category;
-    if (author) updatedFields.author = author;
-    if (status) updatedFields.status = status; // Niba ushaka kuyisubiza mu 'Pending' cyangwa kuyigumisha 'Approved'
-    if (req.file) updatedFields.imageUrl = req.file.path; // Niba wahinduye ifoto
-
     try {
+        const { title, content, category, author, status } = req.body;
+        
         let article = await Article.findById(req.params.id);
         if (!article) return res.status(404).json({ msg: 'Inkuru ntabonetse' });
 
-        article = await Article.findByIdAndUpdate(
-            req.params.id,
-            { $set: updatedFields },
-            { new: true }
-        );
-        res.json(article);
+        // Kuvugurura amakuru
+        if (title) article.title = title;
+        if (content) article.content = content;
+        if (category) article.category = category;
+        if (author) article.author = author;
+        if (status) article.status = status;
+        if (req.file) article.imageUrl = req.file.path; // Cloudinary URL nshya
+
+        const updatedArticle = await article.save();
+        res.json(updatedArticle);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error: Guhindura inkuru byanze');
+        console.error("Update Error:", err.message);
+        res.status(500).json({ msg: 'Server Error: Guhindura inkuru byanze' });
     }
 });
 
-// D. GUSIBA INKURU
+// 5. GUSIBA INKURU
 router.delete('/articles/:id', [auth, admin], async (req, res) => {
     try {
         const article = await Article.findByIdAndDelete(req.params.id);
         if (!article) return res.status(404).json({ msg: 'Inkuru ntabonetse' });
         res.json({ msg: 'Inkuru yasibwe neza' });
     } catch (err) { 
-        res.status(500).send('Server Error'); 
+        res.status(500).json({ msg: 'Server Error' }); 
     }
 });
 
