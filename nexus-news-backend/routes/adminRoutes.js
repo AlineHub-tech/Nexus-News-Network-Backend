@@ -73,10 +73,13 @@ router.delete('/ads/:id', [auth, admin], async (req, res) => {
 
 // --- ARTICLE MANAGEMENT ---
 
-// 1. Kuzana inkuru zitegereje kwemezwa (Zari zateje 404 Error)
+// 1. Kuzana inkuru zitegereje kwemezwa (Zakuweho ikibazo cya Case-Sensitivity)
 router.get('/pending-articles', [auth, admin], async (req, res) => {
     try {
-        const articles = await Article.find({ status: 'Pending' }).sort({ createdAt: -1 });
+        // Ibi bituma ashaka 'pending' cyangwa 'Pending' adatanura inyuguti
+        const articles = await Article.find({ 
+            status: { $regex: /^pending$/i } 
+        }).sort({ createdAt: -1 });
         res.json(articles);
     } catch (err) {
         res.status(500).json({ msg: 'Server Error' });
@@ -86,7 +89,9 @@ router.get('/pending-articles', [auth, admin], async (req, res) => {
 // 2. Kuzana inkuru zemejwe (Approved)
 router.get('/approved-articles', [auth, admin], async (req, res) => {
     try {
-        const articles = await Article.find({ status: 'Approved' }).sort({ createdAt: -1 });
+        const articles = await Article.find({ 
+            status: { $regex: /^approved$/i } 
+        }).sort({ createdAt: -1 });
         res.json(articles);
     } catch (err) {
         res.status(500).json({ msg: 'Server Error' });
@@ -109,7 +114,6 @@ router.put('/articles/:id/approve', [auth, admin], async (req, res) => {
 });
 
 // 4. GUHINDURA INKURU (Edit/Update)
-// Icyitonderwa: Emeza ko kuri Frontend ukoresha 'image' nka field name mu gufata ifoto
 router.put('/articles/:id', [auth, admin, upload.single('image')], async (req, res) => {
     try {
         const { title, content, category, author, status } = req.body;
@@ -117,13 +121,13 @@ router.put('/articles/:id', [auth, admin, upload.single('image')], async (req, r
         let article = await Article.findById(req.params.id);
         if (!article) return res.status(404).json({ msg: 'Inkuru ntabonetse' });
 
-        // Kuvugurura amakuru
+        // Update fields niba zoherejwe
         if (title) article.title = title;
         if (content) article.content = content;
         if (category) article.category = category;
         if (author) article.author = author;
         if (status) article.status = status;
-        if (req.file) article.imageUrl = req.file.path; // Cloudinary URL nshya
+        if (req.file) article.imageUrl = req.file.path;
 
         const updatedArticle = await article.save();
         res.json(updatedArticle);
