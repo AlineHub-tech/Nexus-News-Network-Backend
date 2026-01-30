@@ -1,5 +1,3 @@
-// server/routes/adminRoutes.js
-
 const express = require('express');
 const router = express.Router();
 const Article = require('../models/Article');
@@ -21,21 +19,23 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'nexus-news-uploads',
+    // resource_type: 'auto' ni ingenzi kugira ngo Cloudinary yakire amafoto na videos icyarimwe
     resource_type: 'auto', 
+    // Twakuyemo format: 'jpg' kugira ngo bitica videos cyangwa gif
     public_id: (req, file) => file.fieldname + '-' + Date.now(),
   },
 });
 const upload = multer({ storage: storage });
 
 // ==========================================
-// 1. ARTICLE MANAGEMENT (YAKOSOWE)
+// 1. ARTICLE MANAGEMENT
 // ==========================================
 
-// A. IYI YARI IBUBURE (Fixes 404): Kubona izitarasuzumwa
+// A. Kubona izitarasuzumwa (Pending)
 router.get('/pending-articles', [auth, admin], async (req, res) => {
     try {
         const articles = await Article.find({ 
-            status: { $in: ['pending', 'Pending', 'pending '] } 
+            status: { $in: ['pending', 'Pending'] } 
         }).sort({ createdAt: -1 });
         res.json(articles);
     } catch (err) {
@@ -43,7 +43,7 @@ router.get('/pending-articles', [auth, admin], async (req, res) => {
     }
 });
 
-// B. Kubona izemejwe
+// B. Kubona izemejwe (Approved)
 router.get('/approved-articles', [auth, admin], async (req, res) => {
     try {
         const articles = await Article.find({ 
@@ -55,12 +55,12 @@ router.get('/approved-articles', [auth, admin], async (req, res) => {
     }
 });
 
-// C. Kwemeza inkuru (Fixes Landing Page Visibility)
+// C. Kwemeza inkuru (Approve)
 router.put('/articles/:id/approve', [auth, admin], async (req, res) => {
     try {
         const article = await Article.findByIdAndUpdate(
             req.params.id, 
-            { status: 'Approved' }, // Koresha A nini hano
+            { status: 'Approved' }, 
             { new: true }
         );
         if (!article) return res.status(404).json({ msg: 'Inkuru ntabonetse' });
@@ -80,11 +80,13 @@ router.delete('/articles/:id', [auth, admin], async (req, res) => {
 });
 
 // ==========================================
-// 2. ADS MANAGEMENT (YAKOSOWE)
+// 2. ADS MANAGEMENT
 // ==========================================
 
+// A. Kohereza Ad Nshya
 router.post('/ads', [auth, admin, upload.single('mediaFile')], async (req, res) => {
     const { title, description, mediaType, placement } = req.body;
+    // req.file.path itanga URL yuzuye ya Cloudinary (https://...)
     const mediaUrl = req.file ? req.file.path : null; 
 
     try {
@@ -99,10 +101,12 @@ router.post('/ads', [auth, admin, upload.single('mediaFile')], async (req, res) 
         const savedAd = await newAd.save();
         res.status(201).json(savedAd);
     } catch (err) {
+        console.error(err.message); 
         res.status(500).send('Server Error: Ad upload failed');
     }
 });
 
+// B. Kubona Ads zose kuri Admin
 router.get('/ads', [auth, admin], async (req, res) => {
     try {
         const ads = await Ads.find().sort({ createdAt: -1 });
@@ -110,6 +114,7 @@ router.get('/ads', [auth, admin], async (req, res) => {
     } catch (err) { res.status(500).send('Server Error'); }
 });
 
+// C. Gusiba Ad
 router.delete('/ads/:id', [auth, admin], async (req, res) => {
     try {
         const ad = await Ads.findByIdAndDelete(req.params.id);
