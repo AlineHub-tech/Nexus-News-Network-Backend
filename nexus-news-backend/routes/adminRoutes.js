@@ -1,3 +1,5 @@
+// server/routes/adminRoutes.js
+
 const express = require('express');
 const router = express.Router();
 const Article = require('../models/Article');
@@ -20,7 +22,9 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'nexus-news-uploads',
-    resource_type: 'auto', 
+    resource_type: 'auto', // IBI NI INGENZI KURI VIDEO NA FOTO
+    // Koresha upload_preset niba ariyo washyizeho muri Cloudinary Dashboard
+    upload_preset: 'nexus_news_preset', 
     public_id: (req, file) => `file-${Date.now()}`,
   },
 });
@@ -28,7 +32,7 @@ const upload = multer({ storage: storage });
 
 // --- ADS MANAGEMENT ---
 
-// Kohereza Ad Nshya
+// Kohereza Ad Nshya (Slider cyangwa Sidebar)
 router.post('/ads', [auth, admin, upload.single('mediaFile')], async (req, res) => {
     try {
         const { title, description, mediaType, placement } = req.body;
@@ -73,10 +77,9 @@ router.delete('/ads/:id', [auth, admin], async (req, res) => {
 
 // --- ARTICLE MANAGEMENT ---
 
-// 1. Kuzana inkuru zitegereje kwemezwa (Zakuweho ikibazo cya Case-Sensitivity)
+// 1. Kuzana inkuru zitegereje kwemezwa (Pending)
 router.get('/pending-articles', [auth, admin], async (req, res) => {
     try {
-        // Ibi bituma ashaka 'pending' cyangwa 'Pending' adatanura inyuguti
         const articles = await Article.find({ 
             status: { $regex: /^pending$/i } 
         }).sort({ createdAt: -1 });
@@ -103,7 +106,7 @@ router.put('/articles/:id/approve', [auth, admin], async (req, res) => {
     try {
         const article = await Article.findByIdAndUpdate(
             req.params.id, 
-            { status: 'Approved' }, 
+            { status: 'approved' }, 
             { new: true }
         );
         if (!article) return res.status(404).json({ msg: 'Inkuru ntabonetse' });
@@ -113,21 +116,24 @@ router.put('/articles/:id/approve', [auth, admin], async (req, res) => {
     }
 });
 
-// 4. GUHINDURA INKURU (Edit/Update)
-router.put('/articles/:id', [auth, admin, upload.single('image')], async (req, res) => {
+// 4. GUHINDURA INKURU (Edit/Update) - YAKOSOWE MEDIAURL
+router.put('/articles/:id', [auth, admin, upload.single('mediaFile')], async (req, res) => {
     try {
-        const { title, content, category, author, status } = req.body;
+        const { title, content, category, author, status, mediaType } = req.body;
         
         let article = await Article.findById(req.params.id);
         if (!article) return res.status(404).json({ msg: 'Inkuru ntabonetse' });
 
-        // Update fields niba zoherejwe
+        // Update fields
         if (title) article.title = title;
         if (content) article.content = content;
         if (category) article.category = category;
         if (author) article.author = author;
         if (status) article.status = status;
-        if (req.file) article.imageUrl = req.file.path;
+        if (mediaType) article.mediaType = mediaType;
+        
+        // Hano twakosoye izina ngo rihure n'ibindi: mediaUrl aho kuba imageUrl
+        if (req.file) article.mediaUrl = req.file.path;
 
         const updatedArticle = await article.save();
         res.json(updatedArticle);
