@@ -6,14 +6,14 @@ const ArticleSchema = new mongoose.Schema({
     required: true,
     trim: true 
   },
-  body: { 
+  // Twahinduye 'body' riba 'content' kugira ngo bihuze neza na Dashboards zose twanditse
+  content: { 
     type: String, 
     required: true 
   },
   category: { 
     type: String, 
     required: true, 
-    // Izi categories zihuye neza n'iziri muri AuthorDashboard
     enum: [
       'Politics', 'Life', 'Entertainment', 'Culture', 
       'Education', 'Business', 'Opinion', 'Sport', 
@@ -25,7 +25,7 @@ const ArticleSchema = new mongoose.Schema({
     required: true 
   },
   mediaUrl: { 
-    type: String 
+    type: String // Aha niho hazajya URL ya Cloudinary (https://res.cloudinary.com...)
   },
   mediaType: { 
     type: String, 
@@ -34,19 +34,20 @@ const ArticleSchema = new mongoose.Schema({
   },
   status: { 
     type: String, 
-    // Status yakosowe kugira ngo ihure n'inyuguti nini (Approved) dukoresha muri Admin
+    // Twakomeje uburyo bwo kwemera inyuguti nini cyangwa nto (Case-insensitive)
     enum: ['pending', 'Pending', 'approved', 'Approved', 'draft', 'deleted'], 
     default: 'Pending' 
   },
-  // IYI NI INGENZI: Gushyiraho views bituma Popular/Trending News ikora
   views: {
     type: Number,
     default: 0
   }
 },
 {
-  // Ibi bituma 'createdAt' na 'updatedAt' biza mu buryo bwikora
-  timestamps: true 
+  timestamps: true // Ibi bishyiraho 'createdAt' na 'updatedAt' byikora
 });
+
+// Ibi bituma ishakisha ry'inkuru zemejwe cyangwa izitarasuzumwa ryihuta muri database
+ArticleSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Article', ArticleSchema);
