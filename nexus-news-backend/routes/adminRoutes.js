@@ -20,22 +20,26 @@ cloudinary.config({
 // 2. Tegura Cloudinary Storage
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'nexus-news-uploads',
-    resource_type: 'auto', // IBI NI INGENZI KURI VIDEO NA FOTO
-    // Koresha upload_preset niba ariyo washyizeho muri Cloudinary Dashboard
-    upload_preset: 'nexus_news_preset', 
-    public_id: (req, file) => `file-${Date.now()}`,
+  params: async (req, file) => {
+    return {
+      folder: 'nexus-news-uploads',
+      // 'auto' ifasha kwakira video n'amafoto icyarimwe
+      resource_type: 'auto', 
+      upload_preset: 'nexus_news_preset', // Emeza ko iyi ari 'Unsigned' muri Cloudinary
+      public_id: `file-${Date.now()}-${file.originalname.split('.')[0]}`,
+    };
   },
 });
+
 const upload = multer({ storage: storage });
 
 // --- ADS MANAGEMENT ---
 
-// Kohereza Ad Nshya (Slider cyangwa Sidebar)
+// Kohereza Ad Nshya
 router.post('/ads', [auth, admin, upload.single('mediaFile')], async (req, res) => {
     try {
         const { title, description, mediaType, placement } = req.body;
+        // Cloudinary itanga secure_url (https)
         const mediaUrl = req.file ? req.file.path : null; 
 
         const newAd = new Ads({ 
@@ -49,8 +53,8 @@ router.post('/ads', [auth, admin, upload.single('mediaFile')], async (req, res) 
         const savedAd = await newAd.save();
         res.status(201).json(savedAd);
     } catch (err) {
-        console.error("Ad Error:", err.message);
-        res.status(500).json({ msg: 'Server Error: Ad upload failed' });
+        console.error("Ad Upload Error:", err);
+        res.status(500).json({ msg: 'Ad upload failed', error: err.message });
     }
 });
 
@@ -60,7 +64,7 @@ router.get('/ads', [auth, admin], async (req, res) => {
         const ads = await Ads.find().sort({ createdAt: -1 });
         res.json(ads);
     } catch (err) {
-        res.status(500).send('Server Error');
+        res.status(500).json({ msg: 'Server Error' });
     }
 });
 
@@ -71,13 +75,13 @@ router.delete('/ads/:id', [auth, admin], async (req, res) => {
         if (!ad) return res.status(404).json({ msg: 'Ad ntabonetse' });
         res.json({ msg: 'Ad yasibwe neza' });
     } catch (err) { 
-        res.status(500).send('Server Error'); 
+        res.status(500).json({ msg: 'Server Error' }); 
     }
 });
 
 // --- ARTICLE MANAGEMENT ---
 
-// 1. Kuzana inkuru zitegereje kwemezwa (Pending)
+// 1. Pending Articles
 router.get('/pending-articles', [auth, admin], async (req, res) => {
     try {
         const articles = await Article.find({ 
@@ -89,7 +93,7 @@ router.get('/pending-articles', [auth, admin], async (req, res) => {
     }
 });
 
-// 2. Kuzana inkuru zemejwe (Approved)
+// 2. Approved Articles
 router.get('/approved-articles', [auth, admin], async (req, res) => {
     try {
         const articles = await Article.find({ 
@@ -101,7 +105,7 @@ router.get('/approved-articles', [auth, admin], async (req, res) => {
     }
 });
 
-// 3. KWEMEZA INKURU (Approve)
+// 3. Approve Article
 router.put('/articles/:id/approve', [auth, admin], async (req, res) => {
     try {
         const article = await Article.findByIdAndUpdate(
@@ -116,7 +120,7 @@ router.put('/articles/:id/approve', [auth, admin], async (req, res) => {
     }
 });
 
-// 4. GUHINDURA INKURU (Edit/Update) - YAKOSOWE MEDIAURL
+// 4. Update Article (Edit)
 router.put('/articles/:id', [auth, admin, upload.single('mediaFile')], async (req, res) => {
     try {
         const { title, content, category, author, status, mediaType } = req.body;
@@ -124,26 +128,23 @@ router.put('/articles/:id', [auth, admin, upload.single('mediaFile')], async (re
         let article = await Article.findById(req.params.id);
         if (!article) return res.status(404).json({ msg: 'Inkuru ntabonetse' });
 
-        // Update fields
         if (title) article.title = title;
         if (content) article.content = content;
         if (category) article.category = category;
         if (author) article.author = author;
         if (status) article.status = status;
         if (mediaType) article.mediaType = mediaType;
-        
-        // Hano twakosoye izina ngo rihure n'ibindi: mediaUrl aho kuba imageUrl
         if (req.file) article.mediaUrl = req.file.path;
 
         const updatedArticle = await article.save();
         res.json(updatedArticle);
     } catch (err) {
-        console.error("Update Error:", err.message);
-        res.status(500).json({ msg: 'Server Error: Guhindura inkuru byanze' });
+        console.error("Update Error:", err);
+        res.status(500).json({ msg: 'Guhindura inkuru byanze', error: err.message });
     }
 });
 
-// 5. GUSIBA INKURU
+// 5. Delete Article
 router.delete('/articles/:id', [auth, admin], async (req, res) => {
     try {
         const article = await Article.findByIdAndDelete(req.params.id);
