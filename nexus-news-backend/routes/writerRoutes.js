@@ -6,7 +6,7 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const Article = require('../models/Article'); 
 const auth = require('../middleware/auth'); 
 
-// 1. Configure Cloudinary - Ongeraho secure: true
+// Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -14,26 +14,34 @@ cloudinary.config({
   secure: true 
 });
 
-// 2. Cloudinary Storage Config - Twakuyeho 'async' kuko bishobora gutinda (timeout)
+// 2. KOSORA HANO: Kugira ngo Multer imenye ko harimo Videos
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'nexus-news-uploads',
-    resource_type: 'auto', 
-    upload_preset: 'nexus_news_preset', 
-    // Izina rya file ryoroshye ririnda amakosa ya DNS/Protocol
-    public_id: (req, file) => `writer-${Date.now()}`
+  params: async (req, file) => {
+    // IYI NIYO NGOMBWA: Igena niba ari video cyangwa ishusho
+    const isVideo = file.mimetype.startsWith('video');
+    return {
+      folder: 'nexus-news-uploads',
+      resource_type: isVideo ? 'video' : 'image', // KOSORA HANO!
+      public_id: `writer-${Date.now()}`,
+      // Ongeraho 'chunk_size' niba video ari nini (7.75MB isawa ariko chunks zirinda reset)
+      chunk_size: 6000000 
+    };
   },
 });
 
-const upload = multer({ storage: storage });
+// Ongeraho imipaka (Limits) kugira ngo Render itaza gufunga connection
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 } // Emera kugeza kuri 50MB
+});
 
 // POST /api/writer/articles
 router.post('/articles', [auth, upload.single('mediaFile')], async (req, res) => {
   try {
     const { title, content, category, mediaType } = req.body;
     
-    // IYI NIYO NGOMBWA: req.file.path ni URL yuzuye ya Cloudinary
+    // Niba req.file ihari, 'path' ni URL ya Cloudinary
     const mediaUrl = req.file ? req.file.path : null;
 
     if (!title || !content) {
@@ -45,7 +53,7 @@ router.post('/articles', [auth, upload.single('mediaFile')], async (req, res) =>
       content, 
       category, 
       mediaUrl, 
-      mediaType,
+      mediaType: mediaType || (req.file?.mimetype?.startsWith('video') ? 'video' : 'image'),
       author: req.user.username, 
       status: 'Pending', 
     });
